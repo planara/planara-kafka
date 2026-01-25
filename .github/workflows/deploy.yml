@@ -31,7 +31,7 @@ jobs:
           dotnet-version: '10.0.x'
           cache: true
           cache-dependency-path: |
-            src/Planara.Kafka/packages.lock.json
+            src/packages.lock.json
 
       - name: Restore
         run: dotnet restore Planara.Kafka.sln
@@ -40,7 +40,7 @@ jobs:
         run: dotnet build Planara.Kafka.sln -c Release --no-restore
 
       - name: Pack
-        run: dotnet pack src/Planara.Kafka/Planara.Kafka.csproj -c Release --no-build -o ./nupkg
+        run: dotnet pack src/Planara.Kafka.csproj -c Release --no-build -o ./nupkg
 
       - name: Push to NuGet.org
         env:
