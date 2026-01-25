@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planara.Kafka", "src\Planara.Kafka\Planara.Kafka.csproj", "{007720C4-5B38-4FC4-8540-71F3433DF897}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planara.Kafka", "src\Planara.Kafka.csproj", "{007720C4-5B38-4FC4-8540-71F3433DF897}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
