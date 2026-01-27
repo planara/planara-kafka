@@ -10,13 +10,9 @@ public class KafkaJsonSerializer<TMessage> : ISerializer<TMessage>
 {
     public byte[] Serialize(TMessage data, SerializationContext context)
     {
-        if (data == null)
+        if (data is null)
             return [];
 
-        return JsonSerializer.SerializeToUtf8Bytes(data, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(data, KafkaJson.SerializerOptions);
     }
 }
