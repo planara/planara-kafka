@@ -7,9 +7,9 @@ public class KafkaJsonDeserializer<TMessage>: IDeserializer<TMessage>
 {
     public TMessage Deserialize(ReadOnlySpan<byte> data, bool isNull, SerializationContext context)
     {
-        return JsonSerializer.Deserialize<TMessage>(data, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        })!;
+        if (isNull || data.IsEmpty)
+            return default!;
+        
+        return JsonSerializer.Deserialize<TMessage>(data, KafkaJson.DeserializerOptions)!;
     }
 }
