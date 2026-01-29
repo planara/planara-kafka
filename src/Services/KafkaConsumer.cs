@@ -17,32 +17,40 @@ public class KafkaConsumer<TMessage> : IKafkaConsumer<TMessage> where TMessage :
     private readonly IConsumer<string, TMessage> _consumer;
     private readonly Dictionary<string, string> _consumerTopics;
     private readonly ILogger<KafkaConsumer<TMessage>> _logger;
+    private readonly bool _autoCommit;
+    private readonly bool _autoOffsetStore;
 
     public KafkaConsumer(IOptions<KafkaOptions> options, ILogger<KafkaConsumer<TMessage>> logger)
     {
+        var opt = options.Value;
+        
         _consumerTopics = options.Value.ConsumerTopics;
         _logger = logger;
+        _autoCommit = opt.EnableAutoCommit;
+        _autoOffsetStore = opt.EnableAutoOffsetStore;
+        
+        var groupId = !string.IsNullOrWhiteSpace(opt.ConsumerGroupId)
+            ? opt.ConsumerGroupId
+            : $"group-{typeof(TMessage).Name.ToLower()}";
 
         var config = new ConsumerConfig
         {
             BootstrapServers = options.Value.BootstrapServers,
-            GroupId = $"group-{typeof(TMessage).Name.ToLower()}",
+            GroupId = groupId,
             AutoOffsetReset = AutoOffsetReset.Earliest,
-            EnableAutoCommit = true
+            EnableAutoCommit = opt.EnableAutoCommit,
+            EnableAutoOffsetStore = opt.EnableAutoOffsetStore
         };
 
         _consumer = new ConsumerBuilder<string, TMessage>(config)
             .SetValueDeserializer(new KafkaJsonDeserializer<TMessage>())
-            .SetErrorHandler((_, e) =>
-            {
-                _logger.LogError("Kafka consume error: { 0 }", e.Reason);
-            })
+            .SetErrorHandler((_, e) => _logger.LogError("Kafka consume error: { 0 }", e.Reason))
             .Build();
 
-        _consumer.Subscribe(_consumerTopics.Values);
+        _consumer.Subscribe(_consumerTopics.Values.Distinct());
     }
 
-    public Task<TMessage?> ConsumeAsync(string topicKey, CancellationToken cancellationToken)
+    public Task<ConsumeResult<string, TMessage>?> ConsumeAsync(string topicKey, CancellationToken cancellationToken)
     {
         if (!_consumerTopics.TryGetValue(topicKey, out var topicName))
             throw new ArgumentException($"Topic key '{topicKey}' not found in ConsumerTopics.", nameof(topicKey));
@@ -51,13 +59,44 @@ public class KafkaConsumer<TMessage> : IKafkaConsumer<TMessage> where TMessage :
         {
             try
             {
-                _consumer.Subscribe(topicName);
                 var result = _consumer.Consume(cancellationToken);
-                return result?.Message?.Value;
+                if (result is null || result.IsPartitionEOF) return null;
+
+                if (result.Topic != topicName) return null;
+
+                if (_autoCommit && !_autoOffsetStore)
+                    _consumer.StoreOffset(result);
+
+                return result;
             }
             catch (ConsumeException ex)
             {
                 throw new KafkaConsumeException($"Consume error from topic '{topicName}': {ex.Error.Reason}", ex);
+            }
+        }, cancellationToken);
+    }
+    
+    public Task CommitAsync(ConsumeResult<string, TMessage> result, CancellationToken cancellationToken)
+    {
+        // если авто-коммит включён — ручной commit не нужен
+        if (_autoCommit) return Task.CompletedTask;
+
+        return Task.Run(() =>
+        {
+            try
+            {
+                if (_autoOffsetStore)
+                    _consumer.Commit(result);
+                else
+                {
+                    _consumer.StoreOffset(result);
+                    _consumer.Commit(result);
+                }
+            }
+            catch (KafkaException ex)
+            {
+                _logger.LogWarning(ex, "Kafka commit failed for {TPO}", result.TopicPartitionOffset);
+                throw;
             }
         }, cancellationToken);
     }
