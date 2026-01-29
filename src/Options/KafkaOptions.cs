@@ -19,4 +19,12 @@ public class KafkaOptions
     /// Топики для консюмеров
     /// </summary>
     public required Dictionary<string, string> ConsumerTopics { get; set; } = new();
+    
+    /// <summary>
+    /// Консьюмер-группа 
+    /// </summary>
+    public string? ConsumerGroupId { get; set; }
+    
+    public bool EnableAutoCommit { get; set; } = false;
+    public bool EnableAutoOffsetStore { get; set; } = false;
 }
